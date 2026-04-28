@@ -1,0 +1,16 @@
+kagglehub
+ibm-db==3.2.3
+ibm-db-sa==0.3.8
+ibm-watsonx-ai
+pandas==2.1.4
+numpy==1.26.4
+scikit-learn==1.4.2
+imbalanced-learn==0.12.3
+shap==0.45.1
+matplotlib==3.8.4
+seaborn==0.13.2
+plotly==5.22.0
+jupyter==1.0.0
+ipykernel==6.29.4
+python-dotenv==1.0.1
+requests==2.32.3
