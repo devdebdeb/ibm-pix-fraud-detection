@@ -184,6 +184,43 @@ Under **LGPD Art. 20**, automated decisions that affect data subjects must be ex
 
 ---
 
+## Notebook Code Quality
+
+All notebooks were reviewed and corrected for the following issues:
+
+### 01 — EDA
+- `import os` moved to the imports cell (was scattered inside a visualization cell)
+- `del df_full` added after sampling to free 2M-row DataFrame from memory
+- `value_counts().sort_index()` to guarantee 0=Legítima / 1=Fraude label order
+- `axvspan(20, 23)` corrected (was `(20, 24)` — `hora_dia` max is 23)
+- `plt.close()` added after every figure to prevent memory accumulation
+
+### 02 — Feature Engineering
+- Removed unused `import numpy as np`
+- **Fixed encoding leakage**: `LabelEncoder` is now `fit` on training set only and `transform`ed on test set
+- **Encoders persisted** with `joblib` to `config/le_tipo.pkl` and `config/le_dia.pkl` for deploy consistency
+- **Dropped `saldo_posterior_pagador` and `saldo_posterior_recebedor`**: mathematically derived from `saldo_anterior_*` + `valor_brl` — multicollinear
+- Clarified that `train_resampled.parquet` (SMOTE output) is for local baseline only and is not consumed by AutoAI
+
+### 03 — DB2 Ingestion
+- Removed unused `import numpy as np`, `import ibm_db`, `import ibm_db_dbi`
+- `pandas_dtype_to_db2` rewritten using `pd.api.types` functions instead of fragile string comparison (`'int64'` etc.)
+- Column rename simplified to `lambda c: c.upper()` (removed `.replace('-', '_')` — columns no longer have hyphens)
+
+### 04 — AutoAI Experiment
+- **Fixed critical bug**: `prediction_column='Class'` → `'fraude'`
+- **Fixed leaderboard**: `summary.sort_values('F1 score', ascending=False)` before selecting best pipeline
+- **Renamed variables**: `credentials` → `wml_credentials`, `creds` → `config` to avoid ambiguity
+- Runtime availability listed before selection to surface mismatches early
+
+### 05 — Model Evaluation
+- **Fixed `os.system('tar')` → `tarfile` module** — Windows compatible
+- **Removed destructive write to `credentials.json`**: `scoring_url` is read from `deployment_meta.json` in-memory only
+- All imports consolidated in cell-1 (`f1_score`, `precision_score`, `recall_score` were mid-notebook)
+- SHAP sample seeded with `np.random.default_rng(42)` for reproducibility
+
+---
+
 ## Author
 
 **André Messina** — Data Scientist  
