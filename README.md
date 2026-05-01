@@ -27,7 +27,7 @@ IBM's banking clients — including major Brazilian institutions — face exactl
 
 This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/pix-fraud-br)** — a synthetic dataset of 2 million PIX P2P transactions designed specifically for this problem, published on Hugging Face.
 
-> The dataset was built as a companion project: PaySim's mobile money simulator was adapted to reflect Brazil's official PIX transaction modalities (BCB Manual de Padrões v2.9.0), regulatory rules, and real-world fraud patterns documented by Febraban. Balance columns were regenerated synthetically to enforce PIX atomicity guarantees. See the [dataset repository](https://huggingface.co/datasets/andremessina/pix-fraud-br) for full methodology.
+> Built as a companion project: PaySim's mobile money simulator was adapted to reflect Brazil's official PIX transaction modalities (BCB Manual de Padrões v2.9.0), regulatory rules, and real-world fraud patterns documented by Febraban. Balance columns were regenerated synthetically to enforce PIX atomicity guarantees. See the [dataset card](https://huggingface.co/datasets/andremessina/pix-fraud-br) for full methodology.
 
 | | |
 |---|---|
@@ -42,27 +42,31 @@ This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/
 ## Solution Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                          IBM Cloud (Free Tier)                        │
-│                                                                        │
-│  ┌──────────────────┐    ┌──────────────────┐    ┌────────────────┐  │
-│  │   Db2 on IBM     │───▶│ watsonx.ai       │───▶│ watsonx.ai     │  │
-│  │   Cloud Lite     │    │ Studio Lite      │    │ AutoAI         │  │
-│  │  (Feature Store) │    │ (EDA + Notebooks)│    │ (AutoML)       │  │
-│  └──────────────────┘    └──────────────────┘    └───────┬────────┘  │
-│           ▲                                               │           │
-│           │                                      ┌────────▼────────┐  │
-│           │                                      │ watsonx.ai      │  │
-│           │                                      │ Runtime Lite    │  │
-│           │                                      │ (REST Endpoint) │  │
-│           │                                      └─────────────────┘  │
-└───────────┼──────────────────────────────────────────────────────────┘
-            │
-  ┌─────────┴──────────┐
-  │  PIX Fraud BR      │
-  │  HuggingFace 🤗    │
-  │  2M transactions   │
-  └────────────────────┘
+  ┌─────────────────────┐
+  │   PIX Fraud BR      │
+  │   HuggingFace       │   load_dataset("andremessina/pix-fraud-br")
+  │   2M transactions   │
+  └──────────┬──────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                       IBM Cloud (Free Tier)                         │
+│                                                                      │
+│  ┌─────────────────┐   ┌──────────────────┐   ┌────────────────┐   │
+│  │  Db2 on IBM     │◄──│  watsonx.ai      │──►│ watsonx.ai     │   │
+│  │  Cloud Lite     │   │  Studio Lite     │   │ AutoAI         │   │
+│  │ (Feature Store) │   │ (EDA + Notebooks)│   │ (AutoML)       │   │
+│  └─────────────────┘   └──────────────────┘   └───────┬────────┘   │
+│                                                        │            │
+│                                               ┌────────▼─────────┐  │
+│                                               │ watsonx.ai       │  │
+│                                               │ Runtime Lite     │  │
+│                                               │ (REST Endpoint)  │  │
+│                                               └──────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+                                                        │
+                                               SHAP Explainability
+                                               (LGPD Art. 20)
 ```
 
 ---
@@ -71,9 +75,9 @@ This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/
 
 | Technology | Role | Tier |
 |---|---|---|
-| [Db2 on IBM Cloud](https://www.ibm.com/products/db2-database) | Feature store — single source of truth for transaction data | Lite (free) |
-| [watsonx.ai Studio](https://www.ibm.com/products/watson-studio) | Jupyter notebooks, EDA, feature engineering | Lite (free) |
-| [watsonx.ai AutoAI](https://www.ibm.com/products/watsonx-ai) | Automated pipeline search and hyperparameter optimization | Lite (free) |
+| [Db2 on IBM Cloud](https://www.ibm.com/products/db2-database) | Feature store — 100k transactions, single source of truth | Lite (free) |
+| [watsonx.ai Studio](https://www.ibm.com/products/watson-studio) | Jupyter notebooks — EDA, feature engineering, evaluation | Lite (free) |
+| [watsonx.ai AutoAI](https://www.ibm.com/products/watsonx-ai) | Automated ML — pipeline search, HPO, model selection | Lite (free) |
 | [watsonx.ai Runtime](https://cloud.ibm.com/catalog/services/watsonxai-runtime) | Online model deployment — REST scoring endpoint | Lite (free) |
 | [IBM Cloud Object Storage](https://www.ibm.com/products/cloud-object-storage) | Training data asset storage for AutoAI | Lite (free) |
 
@@ -101,17 +105,22 @@ This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/
 ```
 ibm-pix-fraud-detection/
 ├── notebooks/
-│   ├── 01_eda.ipynb                 # EDA + class imbalance analysis
-│   ├── 02_feature_engineering.ipynb # Feature pipeline + SMOTE
-│   ├── 03_db2_ingestion.ipynb       # Load data to DB2 Lite
-│   ├── 04_autoai_experiment.ipynb   # AutoAI via ibm_watsonx_ai SDK
-│   └── 05_model_evaluation.ipynb    # Metrics + SHAP explainability
+│   ├── 01_eda.ipynb                   # Load from HuggingFace, EDA, sample 100k rows
+│   ├── 02_feature_engineering.ipynb   # Encode categoricals, SMOTE, train/test split
+│   ├── 03_db2_ingestion.ipynb         # Ingest processed data to Db2 Lite
+│   ├── 04_autoai_experiment.ipynb     # Run AutoAI, deploy best pipeline to WML
+│   └── 05_model_evaluation.ipynb      # Score via REST, compute metrics, SHAP
 ├── src/
-│   ├── db2_connector.py             # ibm_db connection utility
-│   ├── feature_engineering.py       # Reusable sklearn transformers
-│   └── wml_scorer.py                # WML REST endpoint client
+│   ├── db2_connector.py               # ibm_db connection utility + batch insert
+│   └── wml_scorer.py                  # WML REST endpoint scoring client
 ├── config/
-│   └── credentials_template.json    # Template — copy to credentials.json
+│   ├── credentials_template.json      # Template — copy to credentials.json
+│   ├── credentials.json               # IBM Cloud credentials (gitignored)
+│   ├── le_tipo.pkl                    # LabelEncoder for tipo_transacao (generated by 02)
+│   ├── le_dia.pkl                     # LabelEncoder for dia_semana (generated by 02)
+│   ├── deployment_meta.json           # WML model/deployment UIDs (generated by 04)
+│   └── results.json                   # Final model metrics (generated by 05)
+├── assets/                            # Visualizations generated by notebooks
 ├── requirements.txt
 └── .gitignore
 ```
@@ -127,31 +136,21 @@ ibm-pix-fraud-detection/
 
 ### 1. IBM Cloud Setup
 
-Provision the following services (all on **Lite / free tier**):
+Provision the following services on **Lite / free tier**:
 
 1. **Db2 on IBM Cloud** — [Create instance](https://cloud.ibm.com/catalog/services/db2)
 2. **watsonx.ai Studio** — [Create instance](https://cloud.ibm.com/catalog/services/watsonxai-studio)
 3. **watsonx.ai Runtime** — [Create instance](https://cloud.ibm.com/catalog/services/watsonxai-runtime)
 4. **Cloud Object Storage** — [Create instance](https://cloud.ibm.com/catalog/services/cloud-object-storage)
 
-After provisioning, fill in your credentials:
+After provisioning, create a Deployment Space in [dataplatform.cloud.ibm.com](https://dataplatform.cloud.ibm.com) associating the Runtime and COS instances, then fill in your credentials:
 
 ```bash
 cp config/credentials_template.json config/credentials.json
 # Edit config/credentials.json with your IBM Cloud service credentials
 ```
 
-### 2. Dataset
-
-The dataset is loaded directly from Hugging Face in notebook 01. No manual download needed:
-
-```python
-from datasets import load_dataset
-ds = load_dataset("andremessina/pix-fraud-br", split="train")
-df = ds.to_pandas()
-```
-
-### 3. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -160,19 +159,21 @@ pip install -r requirements.txt
 > **Note on `ibm_db`:** Requires IBM Data Server Driver. On Windows, install from  
 > [IBM Data Server Driver — Getting Started](https://www.ibm.com/support/pages/getting-started-ibm-data-server-drivers) before running pip install.
 
-### 4. Run Notebooks in Order
+### 3. Run Notebooks in Order
+
+The dataset is loaded automatically from Hugging Face in notebook 01 — no manual download needed.
 
 ```bash
 jupyter notebook
 ```
 
-| Notebook | Action | Est. Time |
+| Notebook | What it does | Est. Time |
 |---|---|---|
-| `01_eda.ipynb` | Run all cells | 2 min |
-| `02_feature_engineering.ipynb` | Run all cells | 3 min |
-| `03_db2_ingestion.ipynb` | Run all cells | 10 min |
-| `04_autoai_experiment.ipynb` | Run all cells | **15–30 min** |
-| `05_model_evaluation.ipynb` | Run all cells | 5 min |
+| `01_eda.ipynb` | Load PIX Fraud BR, sample 100k, EDA visualizations | 3 min |
+| `02_feature_engineering.ipynb` | Encode features, split train/test, SMOTE | 3 min |
+| `03_db2_ingestion.ipynb` | Create TRANSACTIONS table and ingest to Db2 | 10 min |
+| `04_autoai_experiment.ipynb` | Run AutoAI experiment, deploy model to WML | **15–30 min** |
+| `05_model_evaluation.ipynb` | Score test set, compute metrics, SHAP | 5 min |
 
 ---
 
@@ -184,46 +185,10 @@ Under **LGPD Art. 20**, automated decisions that affect data subjects must be ex
 
 ---
 
-## Notebook Code Quality
-
-All notebooks were reviewed and corrected for the following issues:
-
-### 01 — EDA
-- `import os` moved to the imports cell (was scattered inside a visualization cell)
-- `del df_full` added after sampling to free 2M-row DataFrame from memory
-- `value_counts().sort_index()` to guarantee 0=Legítima / 1=Fraude label order
-- `axvspan(20, 23)` corrected (was `(20, 24)` — `hora_dia` max is 23)
-- `plt.close()` added after every figure to prevent memory accumulation
-
-### 02 — Feature Engineering
-- Removed unused `import numpy as np`
-- **Fixed encoding leakage**: `LabelEncoder` is now `fit` on training set only and `transform`ed on test set
-- **Encoders persisted** with `joblib` to `config/le_tipo.pkl` and `config/le_dia.pkl` for deploy consistency
-- **Dropped `saldo_posterior_pagador` and `saldo_posterior_recebedor`**: mathematically derived from `saldo_anterior_*` + `valor_brl` — multicollinear
-- Clarified that `train_resampled.parquet` (SMOTE output) is for local baseline only and is not consumed by AutoAI
-
-### 03 — DB2 Ingestion
-- Removed unused `import numpy as np`, `import ibm_db`, `import ibm_db_dbi`
-- `pandas_dtype_to_db2` rewritten using `pd.api.types` functions instead of fragile string comparison (`'int64'` etc.)
-- Column rename simplified to `lambda c: c.upper()` (removed `.replace('-', '_')` — columns no longer have hyphens)
-
-### 04 — AutoAI Experiment
-- **Fixed critical bug**: `prediction_column='Class'` → `'fraude'`
-- **Fixed leaderboard**: `summary.sort_values('F1 score', ascending=False)` before selecting best pipeline
-- **Renamed variables**: `credentials` → `wml_credentials`, `creds` → `config` to avoid ambiguity
-- Runtime availability listed before selection to surface mismatches early
-
-### 05 — Model Evaluation
-- **Fixed `os.system('tar')` → `tarfile` module** — Windows compatible
-- **Removed destructive write to `credentials.json`**: `scoring_url` is read from `deployment_meta.json` in-memory only
-- All imports consolidated in cell-1 (`f1_score`, `precision_score`, `recall_score` were mid-notebook)
-- SHAP sample seeded with `np.random.default_rng(42)` for reproducibility
-
----
-
 ## Author
 
 **André Messina** — Data Scientist  
 Portfolio project demonstrating IBM enterprise AI stack proficiency for PIX fraud detection.
 
 - Dataset: [huggingface.co/datasets/andremessina/pix-fraud-br](https://huggingface.co/datasets/andremessina/pix-fraud-br)
+- IBM analysis: [github.com/devdebdeb/ibm-pix-fraud-detection](https://github.com/devdebdeb/ibm-pix-fraud-detection)
