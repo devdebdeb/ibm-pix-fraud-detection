@@ -84,19 +84,49 @@ This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/
 ---
 
 ## Key Results
+**Pipeline run (2026-06-15)**
 
-> Results will be populated after running the notebooks end-to-end.
+- **Status:** Partial — dependencies installed and dataset downloaded; notebook execution failed at several steps (details below).
+- **Succeeded:** `pip install -r requirements.txt` completed; `python download_dataset.py` saved dataset to `data/raw/creditcard.csv`.
+- **Failures / blocking issues:**
+  - `01_eda.ipynb`: missing Python package `datasets` (ModuleNotFoundError).
+  - `02_feature_engineering.ipynb`: parquet engine missing (`pyarrow` or `fastparquet`) required to read/write Parquet.
+  - `03_db2_ingestion.ipynb`: `ibm_db` failed to load (DLL import error) — IBM Data Server Driver required on Windows.
+  - `04_autoai_experiment.ipynb`: missing `config/credentials.json` (copy `config/credentials_template.json` and fill IBM Cloud credentials).
 
-| Metric | Value |
-|---|---|
-| ROC-AUC | — |
-| F1 Score (fraud class) | — |
-| Precision | — |
-| Recall | — |
+- **Next steps to complete an end-to-end run:**
+  1. Activate the project's virtual environment (PowerShell):
+
+    ```powershell
+    .\.venv\Scripts\Activate.ps1
+    ```
+
+  2. Install missing packages:
+
+    ```powershell
+    pip install datasets pyarrow fastparquet
+    # On Windows: install IBM Data Server Driver per README note, then reinstall ibm_db
+    ```
+
+  3. Create your credentials file from the template and add IBM Cloud service credentials:
+
+    ```powershell
+    copy config\credentials_template.json config\credentials.json
+    # Edit config\credentials.json with your IBM Cloud credentials
+    ```
+
+  4. Re-run the notebooks (example using nbconvert):
+
+    ```powershell
+    python -m nbconvert --to notebook --execute notebooks/01_eda.ipynb --output executed_notebooks/01_eda.ipynb
+    # Repeat for notebooks 02 -> 05
+    ```
+
+- **Metrics:** Not available — pipeline incomplete due to the failures above.
 
 ### SHAP Feature Importance
 
-> *(Screenshot from notebook 05 — generated after running)*
+> *(Screenshot from notebook 05 — generated after a successful run)*
 
 ---
 
