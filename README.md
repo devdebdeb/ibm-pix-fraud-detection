@@ -84,49 +84,51 @@ This project uses **[PIX Fraud BR](https://huggingface.co/datasets/andremessina/
 ---
 
 ## Key Results
-**Pipeline run (2026-06-15)**
 
-- **Status:** Partial — dependencies installed and dataset downloaded; notebook execution failed at several steps (details below).
-- **Succeeded:** `pip install -r requirements.txt` completed; `python download_dataset.py` saved dataset to `data/raw/creditcard.csv`.
-- **Failures / blocking issues:**
-  - `01_eda.ipynb`: missing Python package `datasets` (ModuleNotFoundError).
-  - `02_feature_engineering.ipynb`: parquet engine missing (`pyarrow` or `fastparquet`) required to read/write Parquet.
-  - `03_db2_ingestion.ipynb`: `ibm_db` failed to load (DLL import error) — IBM Data Server Driver required on Windows.
-  - `04_autoai_experiment.ipynb`: missing `config/credentials.json` (copy `config/credentials_template.json` and fill IBM Cloud credentials).
+End-to-end run on **15 Jun 2026**. AutoAI evaluated 15 pipelines across XGBoost, LightGBM, and Random Forest; the best pipeline (**Pipeline 9 — LightGBM** with feature engineering + two rounds of HPO) was deployed to a watsonx.ai Runtime online endpoint. Metrics below are computed on the **held-out test set (20,000 transactions, 13.7% fraud)** scored through the deployed REST endpoint.
 
-- **Next steps to complete an end-to-end run:**
-  1. Activate the project's virtual environment (PowerShell):
+| Metric | Value |
+|---|---|
+| ROC-AUC | **0.9962** |
+| F1 Score (fraud class) | **0.9418** |
+| Precision (fraud class) | **0.9319** |
+| Recall (fraud class) | **0.9519** |
 
-    ```powershell
-    .\.venv\Scripts\Activate.ps1
-    ```
+**Confusion matrix (test set):**
 
-  2. Install missing packages:
+| | Predicted Legit | Predicted Fraud |
+|---|---|---|
+| **Actual Legit** | 17,062 (TN) | 191 (FP) |
+| **Actual Fraud** | 132 (FN) | 2,615 (TP) |
 
-    ```powershell
-    pip install datasets pyarrow fastparquet
-    # On Windows: install IBM Data Server Driver per README note, then reinstall ibm_db
-    ```
+The model catches **95.2% of fraud** (2,615 / 2,747) while keeping false positives to **1.1%** of legitimate transactions (191 / 17,253) — the precision/recall balance that matters when blocking a legitimate PIX transfer carries real customer cost.
 
-  3. Create your credentials file from the template and add IBM Cloud service credentials:
+**AutoAI pipeline leaderboard (top 5 by holdout F1):**
 
-    ```powershell
-    copy config\credentials_template.json config\credentials.json
-    # Edit config\credentials.json with your IBM Cloud credentials
-    ```
+| Pipeline | Estimator | Enhancements | Holdout ROC-AUC | Holdout Avg. Precision |
+|---|---|---|---|---|
+| Pipeline 9 | LightGBM | HPO + FE + HPO | 0.9991 | 1.0000 |
+| Pipeline 10 | LightGBM (ensemble) | HPO + FE + HPO + Ensemble | 0.9991 | 1.0000 |
+| Pipeline 8 | LightGBM | HPO + FE | 0.9991 | 1.0000 |
+| Pipeline 5 | XGBoost (ensemble) | HPO + FE + HPO + Ensemble | 0.9991 | 1.0000 |
+| Pipeline 7 | LightGBM | HPO | 0.9991 | 1.0000 |
 
-  4. Re-run the notebooks (example using nbconvert):
-
-    ```powershell
-    python -m nbconvert --to notebook --execute notebooks/01_eda.ipynb --output executed_notebooks/01_eda.ipynb
-    # Repeat for notebooks 02 -> 05
-    ```
-
-- **Metrics:** Not available — pipeline incomplete due to the failures above.
+![Model Performance](assets/model_performance.png)
 
 ### SHAP Feature Importance
 
-> *(Screenshot from notebook 05 — generated after a successful run)*
+SHAP (TreeExplainer) attribution over a 500-transaction sample of the test set. `saldo_anterior_recebedor` (the receiver's pre-existing balance) is the single strongest signal — consistent with the mule-account pattern where fraud destinations hold near-empty balances.
+
+| Feature | Mean \|SHAP\| share |
+|---|---|
+| `saldo_anterior_recebedor` | 21.9% |
+| `acima_limite_noturno` | 15.5% |
+| `tipo_transacao_enc` | 14.4% |
+| `saldo_anterior_pagador` | 11.4% |
+| `hora_dia` | 7.3% |
+| `razao_saldo_residual` | 7.2% |
+
+![SHAP Summary](assets/shap_summary.png)
 
 ---
 

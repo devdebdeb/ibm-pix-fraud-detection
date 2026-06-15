@@ -41,17 +41,25 @@ class DB2Connector:
     def query(self, sql: str) -> pd.DataFrame:
         return pd.read_sql(sql, self._conn_dbi)
 
-    def insert_dataframe(self, df: pd.DataFrame, table: str, batch_size: int = 1000) -> None:
+    def insert_dataframe(self, df: pd.DataFrame, table: str, batch_size: int = 5000) -> None:
         cols = ", ".join(df.columns)
         placeholders = ", ".join(["?" for _ in df.columns])
         sql = f"INSERT INTO {table} ({cols}) VALUES ({placeholders})"
         stmt = ibm_db.prepare(self._conn_ibm, sql)
 
-        rows = [tuple(row) for row in df.itertuples(index=False, name=None)]
+        # Normalize to native Python types (ibm_db cannot bind numpy scalars).
+        # Booleans -> int so they map cleanly to SMALLINT columns.
+        df_native = df.copy()
+        bool_cols = df_native.select_dtypes(include="bool").columns
+        if len(bool_cols):
+            df_native[bool_cols] = df_native[bool_cols].astype("int64")
+        rows = df_native.astype(object).where(pd.notnull(df_native), None).values.tolist()
+
+        # execute_many batches each chunk into a single server round-trip — orders of
+        # magnitude faster than per-row ibm_db.execute over the network.
         for i in range(0, len(rows), batch_size):
-            batch = rows[i : i + batch_size]
-            for row in batch:
-                ibm_db.execute(stmt, row)
+            batch = tuple(tuple(r) for r in rows[i : i + batch_size])
+            ibm_db.execute_many(stmt, batch)
             print(f"  Inserted rows {i} – {min(i + batch_size, len(rows))}")
 
     def close(self) -> None:

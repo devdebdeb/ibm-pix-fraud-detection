@@ -1,7 +1,14 @@
 kagglehub
+datasets
+pyarrow
 ibm-db==3.2.3
 ibm-db-sa==0.3.8
 ibm-watsonx-ai
+# autoai-libs + lale + lightgbm are required to load the AutoAI pipeline locally
+# for SHAP (notebook 05); lightgbm must match the version AutoAI trained with.
+autoai-libs
+lale
+lightgbm==4.5.0
 pandas==2.1.4
 numpy==1.26.4
 scikit-learn==1.4.2

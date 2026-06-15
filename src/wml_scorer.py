@@ -14,10 +14,18 @@ def get_iam_token(api_key: str) -> str:
 
 
 class WMLScorer:
-    def __init__(self, credentials_path: str = "config/credentials.json"):
+    def __init__(self, credentials_path: str = "config/credentials.json", scoring_url: str | None = None):
         with open(credentials_path) as f:
             creds = json.load(f)["wml"]
-        self.scoring_url: str = creds["scoring_url"]
+        # scoring_url comes from deployment_meta.json (notebook 04) and may be passed
+        # explicitly; fall back to credentials.json for backward compatibility.
+        url = scoring_url or creds.get("scoring_url")
+        if not url:
+            raise ValueError("scoring_url not provided and not present in credentials.json")
+        # The WML v2 online scoring endpoint requires a version query parameter.
+        if "version=" not in url:
+            url += ("&" if "?" in url else "?") + "version=2021-05-01"
+        self.scoring_url: str = url
         self._token = get_iam_token(creds["apikey"])
 
     def score(self, records: list[list]) -> list[dict]:

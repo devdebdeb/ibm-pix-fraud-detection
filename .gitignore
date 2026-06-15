@@ -3,6 +3,11 @@ config/credentials.json
 *.env
 .env
 
+# Environment-specific generated outputs (deployment IDs, metrics, encoders)
+config/deployment_meta.json
+config/results.json
+config/*.pkl
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,6 +21,13 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
+
+# AutoAI SDK scratch artifacts (regenerated on each run)
+request.json
+notebooks/request.json
+pipeline-model.json
+notebooks/pipeline-model.json
+*.pickle.tar.gz
 
 # Data (too large for git)
 data/
